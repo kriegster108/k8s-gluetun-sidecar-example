@@ -1,0 +1,85 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: qbittorrent-vpn
+  labels:
+    app: qbittorrent
+spec:
+  replicas: 1
+  strategy:
+      type: RollingUpdate
+      rollingUpdate:
+         maxSurge: 1
+  selector:
+     matchLabels:
+       app: qbittorrent
+  template:
+    metadata:
+      labels:
+        app: qbittorrent
+    spec:
+     containers:
+        - name: gluetun
+          image: ghcr.io/qdm12/gluetun:v3.40
+          imagePullPolicy: Always
+          securityContext:
+            privileged: true
+            capabilities:
+              add: ["NET_ADMIN"]
+          env:
+          - name: TZ
+            value: "US/Mountain"
+            # Set split tunnel port configuration to allow traffic for qtorrent web ui
+          - name: FIREWALL_INPUT_PORTS
+            value: "8080"
+          - name: SERVER_COUNTRIES
+            value: "United States"
+          - name: SERVER_CITIES
+            value: "Dallas"
+          - name: VPN_SERVICE_PROVIDER
+            value: "nordvpn"
+          - name: DNS_KEEP_NAMESERVER
+            value: "off"
+          - name: DOT
+            value: "off"
+          - name: VPN_TYPE
+            value: "wireguard"
+          - name: WIREGUARD_PRIVATE_KEY
+            value: "XXXX"
+          # If you having connection issues, try enabling these variables to help diagnose it.
+          # - name: FIREWALL_DEBUG
+          #   value: "on"
+          # - name: FIREWALL_INPUT_PORTS
+          #   value: "8080"
+        - name: qtorrent
+          env:
+          - name: TZ
+            value: US/Mountain
+          - name: PUID
+            value: "1000"
+          - name: PGID
+            value: "1000"
+          - name: WEBUI_PORT
+            value: "8080"                      
+          image: lscr.io/linuxserver/qbittorrent:5.0.3
+          ports:
+          - name: http
+            protocol: TCP
+            containerPort: 8080            
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: qbittorrent-svc
+  annotations:
+spec:
+  selector:
+    app: qbittorrent
+  ports:
+  - port: 8080               
+    targetPort: 8080         
+    name: qtorrentui             
+    protocol: TCP
+  type: ClusterIP
+---
